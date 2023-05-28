@@ -1,0 +1,16 @@
+[package]
+name = "chester"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ndarray = { version = "0.15.6", features = ["serde"] }
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.93"
+rand = "0.8.5"
+anyhow = "1.0.69"
+base64 = "0.21.0"
+cozy-chess = { version = "0.3.2", features = ["std"] }
+cozy-chess-types = { version = "0.2.1", features = ["std"] }
