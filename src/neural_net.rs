@@ -3,12 +3,14 @@ use std::cell::RefCell;
 use ndarray::{Array2, Array1, array, s, NewAxis, arr1};
 use serde::{Deserialize, Serialize};
 
+static LN_HALF: f64 = -0.69314718056;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Activation {
     Linear,
     ReLU,
     LeakyReLU,
+    Softmax,
 }
 
 impl Activation {
@@ -17,6 +19,10 @@ impl Activation {
             Self::ReLU => x.map(|x| x.max(0.0)),
             Self::LeakyReLU => x.map(|x| x.max(x * 0.1)),
             Self::Linear => x.clone(),
+            Self::Softmax => {
+                let t = x.map(|x| x.exp()).sum();
+                x.map(|x| x.exp() / t)
+            }
         }
     }
 
@@ -25,6 +31,22 @@ impl Activation {
             Self::ReLU => x.map(|x| if x > &0.0 {1.0} else {0.0}),
             Self::LeakyReLU => x.map(|x| if x > &0.0 {1.0} else {0.01}),
             Self::Linear => Array1::ones(x.shape()[0]),
+            Self::Softmax => {
+                let s = self.apply(x);
+                let mut out = x.clone();
+                for i in 0..x.len() {
+                    let mut total = 0.0;
+                    for j in 0..x.len() {
+                        if i == j {
+                            total += s[i] * (1.0 - s[i]);
+                        } else {
+                            total += -s[i] * s[j];
+                        }
+                    }
+                    out[i] = total;
+                }
+                out
+            }
         }
     }
 }
@@ -33,18 +55,21 @@ impl Activation {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Cost {
     Mse,
+    CrossEntropy,
 }
 
 impl Cost {
     pub fn apply(&self, p: &Array1<f64>, y: &Array1<f64>) -> Array1<f64> {
         match self {
             Self::Mse => 0.5 * (p - y).map(|x| x.powi(2)),
+            Self::CrossEntropy => -y * p.map(|x| x.log2()),
         }
     }
 
     pub fn diff(&self, p: &Array1<f64>, y: &Array1<f64>) -> Array1<f64> {
         match self {
             Self::Mse => p - y,
+            Self::CrossEntropy => (y * LN_HALF) / p,
         }
     }
 }
@@ -86,7 +111,7 @@ impl Layer {
     pub fn add_random_layer(&mut self, size: usize, activation: Activation) {
         match &self.child {
             Some(x) => x.borrow_mut().add_random_layer(size, activation),
-            None => self.add_layer( //TODO idk
+            None => self.add_layer( // TODO idk
                 Layer::random(self.biases.shape()[0], size, activation)
             ),
         }
@@ -134,6 +159,14 @@ impl Layer {
         let db = doutput.clone();
 
         (dw, db, da)
+    }
+
+    pub fn scale(&mut self, sf: f64) {
+        self.weights *= sf;
+        self.biases *= sf;
+        if let Some(child) = &self.child {
+            child.borrow_mut().scale(sf);
+        }
     }
 }
 

@@ -5,6 +5,9 @@ use cozy_chess::{Board, GameStatus};
 use cozy_chess_types::{Color, Piece, Move};
 use rand::prelude::*;
 
+pub mod ai;
+pub mod tools;
+
 #[derive(Debug, Clone)]
 pub struct Metadata {
     pub action: Move,

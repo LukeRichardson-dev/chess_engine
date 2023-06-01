@@ -1,15 +1,25 @@
 use cozy_chess::Board;
-use cozy_chess_types::{BitBoard, Color, Piece};
+use cozy_chess_types::{BitBoard, Color, Piece, Move};
 use ndarray::Array1;
 use std::{hash::Hash};
 use crate::game::Game;
 
-#[derive(Debug, Default)]
-pub struct ChessState {
-    board: Board,
+
+#[derive(Debug, Default, Clone)]
+pub struct ChessState { // TODO: Clone maybe not needed
+    pub board: Board,
 }
 
-impl ChessState {}
+impl ChessState {
+    pub fn moves(&self) -> Vec<Move> {
+        let mut moves = vec![];
+        self.board.generate_moves(|mvs| {
+            mvs.into_iter().for_each(|x| moves.push(x));
+            false
+        });
+        moves
+    }
+}
 
 impl Hash for ChessState {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -20,7 +30,7 @@ impl Hash for ChessState {
 impl Game for ChessState {
     type Children = Self;
 
-    fn branch(&self) -> Vec<Self::Children> {
+    fn branch(&self) -> Vec<Self> {
         let mut children = vec![];
         self.board.generate_moves(|moves| {
             moves.into_iter().for_each(

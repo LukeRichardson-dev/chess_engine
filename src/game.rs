@@ -1,5 +1,4 @@
 use std::hash::Hash;
-
 use ndarray::Array1;
 
 pub trait Game: Hash {
