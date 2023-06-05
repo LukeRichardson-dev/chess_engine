@@ -51,18 +51,18 @@ impl Instance {
                 }
             }
             *sq = match (c1, c & 0b10000000 == 0) {
-                (1, true) => Some((Piece::Pawn, Color::Black)),
-                (1, false) => Some((Piece::Pawn, Color::White)),
-                (2, true) => Some((Piece::Rook, Color::Black)),
-                (2, false) => Some((Piece::Rook, Color::White)),
-                (3, true) => Some((Piece::Knight, Color::Black)),
+                (1, true ) => Some((Piece::Pawn,   Color::Black)),
+                (1, false) => Some((Piece::Pawn,   Color::White)),
+                (2, true ) => Some((Piece::Rook,   Color::Black)),
+                (2, false) => Some((Piece::Rook,   Color::White)),
+                (3, true ) => Some((Piece::Knight, Color::Black)),
                 (3, false) => Some((Piece::Knight, Color::White)),
-                (4, true) => Some((Piece::Bishop, Color::Black)),
+                (4, true ) => Some((Piece::Bishop, Color::Black)),
                 (4, false) => Some((Piece::Bishop, Color::White)),
-                (5, true) => Some((Piece::Queen, Color::Black)),
-                (5, false) => Some((Piece::Queen, Color::White)),
-                (6, true) => Some((Piece::King, Color::Black)),
-                (6, false) => Some((Piece::King, Color::White)),
+                (5, true ) => Some((Piece::Queen,  Color::Black)),
+                (5, false) => Some((Piece::Queen,  Color::White)),
+                (6, true ) => Some((Piece::King,   Color::Black)),
+                (6, false) => Some((Piece::King,   Color::White)),
                 _ => None,
             };
         });

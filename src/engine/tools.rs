@@ -170,3 +170,65 @@ impl Analysis {
         self.children.iter_mut().map(|x| tools.policy(&x.analysis().encoding)).collect()
     }
 }
+
+pub struct AccumulativeAnalysis {
+    positions: HashMap<String, PositionAnalysis>,
+}
+
+pub struct PositionAnalysis {
+    state: ChessState,
+    encoding: Array1<f64>,
+    // children: Vec<String>, TODO!!
+    visits: usize,
+    wins: f64,
+    policy: Option<f64>,
+    value: Option<f64>,
+}
+
+impl PositionAnalysis {
+    fn from_state(state: ChessState) -> Self {
+        Self {
+            encoding: state.state(),
+            visits: 0,
+            wins: 0.0,
+            policy: None,
+            value: None,
+            state,
+        }
+    }
+
+    fn exploit(&self) -> f64 {
+        match self.state.board.side_to_move() {
+            Color::Black => 1.0 - (self.wins as f64 / self.visits as f64),
+            Color::White => self.wins as f64 / self.visits as f64,
+        }
+    }
+
+    fn explore(&self, n: usize, c: f64) -> f64 {
+        (c * ((n as f64).ln() / self.visits as f64)).sqrt()
+    }
+
+    pub fn ucb(&self, n usize, c: f64) -> f64 {
+        self.exploit() + self.explore(n, c)
+    }
+
+    pub fn policy<T: Tools>(&mut self, tools: &T) -> f64 {
+        if let Some(p) = self.policy {
+            p
+        } else {
+            let p = tools.policy(self.encoding);
+            self.policy = Some(p);
+            p
+        }
+    }
+
+    pub fn value<T: Tools>(&mut self, tools: &T) -> f64 {
+        if let Some(p) = self.policy {
+            p
+        } else {
+            let p = tools.policy(self.encoding);
+            self.policy = Some(p);
+            p
+        }
+    }
+}
