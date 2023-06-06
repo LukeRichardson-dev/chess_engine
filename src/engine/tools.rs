@@ -172,13 +172,17 @@ impl Analysis {
 }
 
 pub struct AccumulativeAnalysis {
-    positions: HashMap<String, PositionAnalysis>,
+    positions: HashMap<Board, PositionAnalysis>,
+}
+
+impl AccumulativeAnalysis {
+    pub fn try_get_game(&mut self, gt)
 }
 
 pub struct PositionAnalysis {
     state: ChessState,
     encoding: Array1<f64>,
-    // children: Vec<String>, TODO!!
+    children: Vec<Board>,
     visits: usize,
     wins: f64,
     policy: Option<f64>,
@@ -230,5 +234,9 @@ impl PositionAnalysis {
             self.policy = Some(p);
             p
         }
+    }
+
+    pub fn search<'a>(&mut self, cache: &mut AccumulativeAnalysis) -> &'a mut PositionAnalysis {
+        
     }
 }
