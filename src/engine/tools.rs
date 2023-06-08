@@ -1,5 +1,6 @@
-use std::cell::{RefCell, RefMut};
+use std::{cell::{RefCell, RefMut}, collections::{HashMap, VecDeque}, rc::Rc};
 
+use anyhow::Result;
 use cozy_chess::Board;
 use cozy_chess_types::{Color, Square};
 use ndarray::Array1;
@@ -172,36 +173,87 @@ impl Analysis {
 }
 
 pub struct AccumulativeAnalysis {
-    positions: HashMap<Board, PositionAnalysis>,
+    positions: HashMap<u64, Rc<RefCell<PositionAnalysis>>>, // pain
+    temp_pool: HashMap<u64, ChessState>
 }
 
 impl AccumulativeAnalysis {
-    pub fn try_get_game(&mut self, gt)
+    fn with_positions(positions: HashMap<u64, Rc<RefCell<PositionAnalysis>>>) -> Self {
+        Self { positions, temp_pool: HashMap::new() }
+    }
+
+    pub fn from_position(state: ChessState) -> Result<Self> {
+        let mut positions = HashMap::with_capacity(1);
+        
+        let hash = state.board.hash();
+        let (analysis, children) = PositionAnalysis::from_state(state);
+
+        positions.insert(hash, Rc::new(RefCell::new(analysis)));
+
+        let mut buf = Self::with_positions(positions);
+        children.into_iter().for_each(|x| buf.add_to_pool(x));
+
+        Ok(buf)
+    }
+
+    fn add_to_pool(&mut self, (hash, state): (u64, ChessState)) {
+        if self.positions.contains_key(&hash) { return; }
+        if self.temp_pool.contains_key(&hash) { return; }
+
+        self.temp_pool.insert(hash, state);
+    }
+
+    fn try_get_analysis<'a>(&'a mut self, hash: &u64) -> Option<Rc<RefCell<PositionAnalysis>>> {
+        if let Some(analysis) = self.positions.get(hash) { return Some(analysis.clone()); }
+        else if let Some(state) = self.temp_pool.remove(hash) { 
+            let (analysis, children) = PositionAnalysis::from_state(state);
+            children.into_iter().for_each(|x| self.add_to_pool(x));
+
+            let aref = Rc::new(RefCell::new(analysis));
+            self.positions.insert(*hash, aref.clone());
+            // .expect("State should not have a pre-existing analysis."); // TODO: More elegant error / more flexible architecture
+
+            return Some(aref);
+        }
+
+        None
+    } 
+
+    pub fn mcts<T: Tools>(&mut self, hash: u64, tools: &T, c: f64, depth: usize) {
+        self.try_get_analysis(&hash).unwrap().borrow_mut().mcts(self, tools, c, depth);
+    }
+
 }
 
 pub struct PositionAnalysis {
     state: ChessState,
     encoding: Array1<f64>,
-    children: Vec<Board>,
     visits: usize,
     wins: f64,
+    hash: u64,
     policy: Option<f64>,
+    children: Vec<u64>,
     value: Option<f64>,
 }
 
 impl PositionAnalysis {
-    fn from_state(state: ChessState) -> Self {
-        Self {
+    fn from_state(state: ChessState) -> (Self, Vec<(u64, ChessState)>) {
+
+        let children: Vec<_> = state.branch().into_iter().map(|x| (x.board.hash(), x)).collect();
+
+        (Self {
             encoding: state.state(),
             visits: 0,
             wins: 0.0,
+            hash: state.board.hash(),
             policy: None,
             value: None,
+            children: children.iter().map(|x| x.0).collect(),
             state,
-        }
+        }, children)
     }
 
-    fn exploit(&self) -> f64 {
+    pub fn exploit(&self) -> f64 {
         match self.state.board.side_to_move() {
             Color::Black => 1.0 - (self.wins as f64 / self.visits as f64),
             Color::White => self.wins as f64 / self.visits as f64,
@@ -212,7 +264,8 @@ impl PositionAnalysis {
         (c * ((n as f64).ln() / self.visits as f64)).sqrt()
     }
 
-    pub fn ucb(&self, n usize, c: f64) -> f64 {
+    pub fn ucb(&self, n: usize, c: f64) -> f64 {
+        if !self.visited() { return 100.0 }
         self.exploit() + self.explore(n, c)
     }
 
@@ -220,7 +273,7 @@ impl PositionAnalysis {
         if let Some(p) = self.policy {
             p
         } else {
-            let p = tools.policy(self.encoding);
+            let p = tools.policy(&self.encoding);
             self.policy = Some(p);
             p
         }
@@ -230,13 +283,94 @@ impl PositionAnalysis {
         if let Some(p) = self.policy {
             p
         } else {
-            let p = tools.policy(self.encoding);
+            let p = tools.policy(&self.encoding);
             self.policy = Some(p);
             p
         }
     }
 
-    pub fn search<'a>(&mut self, cache: &mut AccumulativeAnalysis) -> &'a mut PositionAnalysis {
-        
+    pub fn visited(&self) -> bool {
+        self.visits != 0
     }
+
+    pub fn search<T: Tools>(&self, cache: &mut AccumulativeAnalysis, tools: &T, c: f64, q: &mut VecDeque<Rc<RefCell<PositionAnalysis>>>) -> Rc<RefCell<PositionAnalysis>> {
+        
+        let analysis = self.children.iter()
+            .map(|x| cache.try_get_analysis(x).unwrap())
+            .map(|x| ({x.borrow().ucb(self.visits, c)}, x.clone()))
+            .max_by(|x, y| x.0.partial_cmp(&y.0).unwrap());
+
+        if let Some(a) = analysis {
+            q.push_back(a.1.clone());
+            if !a.1.borrow().visited() {
+                return a.1;
+            } else {
+                return a.1.borrow().search(cache, tools, c, q);
+            }
+        } 
+        
+        let a = cache.try_get_analysis(&self.hash).unwrap();
+        q.push_back(a.clone());
+        a
+    }
+
+    pub fn rollout<T: Tools>(&mut self, cache: &mut AccumulativeAnalysis, tools: &T, depth: usize) -> f64 {
+        if depth == 0 {
+            let score = self.value(tools);
+            self.increment(score);
+            return score;
+        }
+
+        if self.children.len() == 0 {
+            match self.state.board.status() {
+                cozy_chess::GameStatus::Won => return match self.state.board.side_to_move() {
+                    Color::White => 0.0,
+                    Color::Black => 1.0,
+                },
+                cozy_chess::GameStatus::Drawn => return 0.0,
+                _ => panic!(),
+            }
+        }
+
+        if self.visits != 0 {
+            let analysis = self.children.iter()
+                .map(|x| cache.try_get_analysis(x).unwrap())
+                .filter(|x| x.borrow().visited())
+                .map(|x| (x.borrow_mut().exploit(), x.clone()))
+                .max_by(|x, y| x.0.partial_cmp(&y.0).unwrap())
+                .unwrap().1;
+
+            return analysis.borrow_mut().rollout(cache, tools, depth - 1);
+        }
+
+        let analysis = self.children.iter()
+            .map(|x| cache.try_get_analysis(x).unwrap())
+            .map(|x| (x.borrow_mut().policy(tools), x.clone()))
+            .max_by(|x, y| x.0.partial_cmp(&y.0).unwrap())
+            .unwrap().1;
+
+        let x = analysis.borrow_mut().rollout(cache, tools, depth - 1); 
+        x
+    }
+
+    fn side(&self) -> Color {
+        self.state.board.side_to_move()
+    }
+
+    pub fn increment(&mut self, score: f64) {
+        self.visits += 1;
+        self.wins += match self.side() {
+            Color::White => score,
+            Color::Black => 1.0 - score,
+        }
+    }
+
+    pub fn mcts<T: Tools>(&mut self, cache: &mut AccumulativeAnalysis, tools: &T, c: f64, depth: usize) {
+        let mut q = VecDeque::default();
+        let analysis = self.search(cache, tools, c, &mut q);
+        let score = analysis.borrow_mut().rollout(cache, tools, depth);
+        
+        q.drain(..).for_each(|x| x.borrow_mut().increment(score));
+    }
+
 }

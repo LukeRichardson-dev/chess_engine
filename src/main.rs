@@ -1,9 +1,9 @@
-use cozy_chess::{BoardBuilder};
-use cozy_chess_types::bitboard;
-use engine::{EngineState, tools::{Analysis, Tools}};
+// use chester::engine::tools::AccumulativeAnalysis;
+use engine::tools::{Analysis, Tools};
 use rand::random;
 
-use crate::{chess::{ChessState}, engine::ai::Thod};
+use crate::{engine::{ai::Thod, tools::AccumulativeAnalysis}};
+use chess::ChessState;
 
 mod neural_net;
 mod engine;
@@ -27,18 +27,23 @@ fn main() {
     // let mut thod = Thod::default();
     // thod.save("test.json").unwrap();
 
-    let mut analysis = &mut Analysis::from_state(ChessState::default());
-    println!("{:?}", analysis.probabilities(&thod));
-    loop {
-        for _ in 0..600 {
-            analysis.simulate(&thod, 3);
-        }
-        analysis.eval();
-        analysis.advance();
+    println!("STARTING MCTS");
 
-        analysis.show_board();
-        println!()
-    }
+    let mut analysis = AccumulativeAnalysis::from_position(ChessState::default()).unwrap();
+    analysis.mcts(ChessState::default().board.hash(), &thod, 2.0, 3);
+
+    // let mut analysis = &mut Analysis::from_state(ChessState::default());
+    // println!("{:?}", analysis.probabilities(&thod));
+    // loop {
+    //     for _ in 0..20 {
+    //         analysis.simulate(&thod, 3);
+    //     }
+    //     analysis.eval();
+    //     analysis.advance();
+
+    //     analysis.show_board();
+    //     println!()
+    // }
     // analysis.eval();
     
     // let mut state = EngineState::from_state(BoardBuilder::default().build().unwrap());

@@ -3,8 +3,6 @@ name = "chester"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [[bin]]
 name = "main"
 path = "src/main.rs"
@@ -14,7 +12,7 @@ name = "trainer"
 path = "src/trainer.rs"
 
 [dependencies]
-ndarray = { version = "0.15.6", features = ["serde"] }
+ndarray = { version = "0.15.6", features = ["serde", "matrixmultiply-threading"] }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = "1.0.93"
 rand = "0.8.5"

@@ -11,6 +11,8 @@ mod database;
 mod chess;
 mod game;
 mod neural_net;
+mod model;
+
 
 pub fn main() {
     let broken = "AkBAQEBABkABAUADwwFAAUBAQAUBQAFAQEBAQEBAQEBAQEDBQEBAwUDBQMVAQEBAQMFAQEDBwUBAQEDCwkDGQA==";
@@ -24,14 +26,21 @@ pub fn main() {
     let test = get_batch(&conn, 5, 64);
 
     loop {
-        let batch = get_batch(&conn, 0, 2000);
+        let batch = get_batch(&conn, 0, 200);
+
+        // if( e4){
+        //     surrender();
+
+        // } else {
+        //     win();
+        // }
 
         for (idx, i) in batch.iter().enumerate() {
-            thod.train_policy(&i.state(), i.winrate().0, 0.008);
-            thod.train_value (&i.state(), i.winrate().0, 0.008);
+            thod.train_policy(&i.state(), i.winrate().0, 0.001);
+            thod.train_value (&i.state(), i.winrate().0, 0.0003);
             
             if idx % 100 == 0 {
-                println!("{idx}/2000")
+                println!("{idx}/200")
             }
         }
     
