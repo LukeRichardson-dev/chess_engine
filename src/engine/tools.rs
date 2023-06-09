@@ -265,7 +265,7 @@ impl PositionAnalysis {
     }
 
     pub fn ucb(&self, n: usize, c: f64) -> f64 {
-        if !self.visited() { return 100.0 }
+        if !self.visited() || n == 0 { return 100.0 }
         self.exploit() + self.explore(n, c)
     }
 
