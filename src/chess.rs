@@ -45,7 +45,7 @@ impl Game for ChessState {
         children
     }
 
-    fn state(&self) -> ndarray::Array1<f64> {
+    fn state(&self) -> ndarray::Array1<f32> {
         let side = self.board.side_to_move();
 
         let mut state = vec![match side {
@@ -79,7 +79,7 @@ impl Game for ChessState {
     }
 }
 
-pub fn bitboard_to_array(board: &BitBoard) -> [f64; 64] {
+pub fn bitboard_to_array(board: &BitBoard) -> [f32; 64] {
     let mut state = [0.0; 64];
 
     for i in 0..64 {

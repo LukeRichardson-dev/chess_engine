@@ -26,7 +26,7 @@ pub fn main() {
     let test = get_batch(&conn, 5, 64);
 
     loop {
-        let batch = get_batch(&conn, 0, 200);
+        let batch = get_batch(&conn, 0, 10);
 
         // if( e4){
         //     surrender();
@@ -36,10 +36,10 @@ pub fn main() {
         // }
 
         for (idx, i) in batch.iter().enumerate() {
-            thod.train_policy(&i.state(), i.winrate().0, 0.001);
-            thod.train_value (&i.state(), i.winrate().0, 0.0003);
+            thod.train_policy(&i.state(), i.winrate().0, 0.02);
+            thod.train_value (&i.state(), i.winrate().0, 0.01);
             
-            if idx % 100 == 0 {
+            if idx % 1 == 0 {
                 println!("{idx}/200")
             }
         }

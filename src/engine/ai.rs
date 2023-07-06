@@ -36,6 +36,27 @@ impl Thod {
         Self { policy, value }
     }
 
+    pub fn from_shape_linear(pol: Vec<usize>, val: Vec<usize>) -> Self {
+        let mut policy = Layer::random(1089, pol[0], Activation::Linear);
+        let mut value  = Layer::random(1089, val[0], Activation::Linear);
+
+        for i in pol.iter().skip(1) {
+            policy.add_random_layer(*i, Activation::Linear);
+        }
+
+        for i in val.iter().skip(1) {
+            value.add_random_layer(*i, Activation::Linear);
+        }
+
+        policy.add_random_layer(2, Activation::Softmax);
+        value.add_random_layer(2, Activation::Softmax);
+
+        value.scale(0.4);
+        policy.scale(0.3);
+
+        Self { policy, value }
+    }
+
     pub fn from_file(path: &str) -> Result<Self> {
         let mut file = File::open(path)?;
         let mut buf = String::default();
@@ -51,11 +72,11 @@ impl Thod {
         Ok(())
     }
 
-    pub fn train_policy(&mut self, state: &Array1<f64>, outcome: f64, lr: f64) {
+    pub fn train_policy(&mut self, state: &Array1<f32>, outcome: f32, lr: f32) {
         self.policy.train(state, &arr1(&[outcome, 1.0 - outcome]), &crate::neural_net::Cost::CrossEntropy, lr);
     }
 
-    pub fn train_value(&mut self, state: &Array1<f64>, outcome: f64, lr: f64) {
+    pub fn train_value(&mut self, state: &Array1<f32>, outcome: f32, lr: f32) {
         self.value.train(state, &arr1(&[outcome, 1.0 - outcome]), &crate::neural_net::Cost::CrossEntropy, lr);
     }
 }
@@ -67,12 +88,12 @@ impl Default for Thod {
 }
 
 impl Tools for Thod {
-    fn policy(&self, state: &ndarray::Array1<f64>) -> f64 {
+    fn policy(&self, state: &ndarray::Array1<f32>) -> f32 {
         let r = self.policy.predict(state);
         return r[0];
     }
 
-    fn value(&self, state: &ndarray::Array1<f64>) -> f64 {
+    fn value(&self, state: &ndarray::Array1<f32>) -> f32 {
         let r = self.value.predict(state);
         return r[0];
     }

@@ -77,13 +77,13 @@ impl Instance {
     }
 
 
-    pub fn winrate(&self) -> (f64, f64) {
-        let t = (self.wins + self.losses) as f64;
-        let w = self.wins as f64 / t;
+    pub fn winrate(&self) -> (f32, f32) {
+        let t = (self.wins + self.losses) as f32;
+        let w = self.wins as f32 / t;
         (w, 1.0 - w)
     }
 
-    pub fn state(&self) -> Array1<f64> {
+    pub fn state(&self) -> Array1<f32> {
         self.board.state()
     }
 }

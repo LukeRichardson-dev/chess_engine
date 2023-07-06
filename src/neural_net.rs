@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use ndarray::{Array2, Array1, array, s, NewAxis, arr1};
 use serde::{Deserialize, Serialize};
 
-static LN_HALF: f64 = -0.69314718056;
+static LN_HALF: f32 = -0.69314718056;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum Activation {
@@ -14,7 +14,7 @@ pub enum Activation {
 }
 
 impl Activation {
-    pub fn apply(&self, x: &Array1<f64>) -> Array1<f64> {
+    pub fn apply(&self, x: &Array1<f32>) -> Array1<f32> {
         match self {
             Self::ReLU => x.map(|x| x.max(0.0)),
             Self::LeakyReLU => x.map(|x| x.max(x * 0.1)),
@@ -26,7 +26,7 @@ impl Activation {
         }
     }
 
-    pub fn diff(&self, x: &Array1<f64>) -> Array1<f64> {
+    pub fn diff(&self, x: &Array1<f32>) -> Array1<f32> {
         match self {
             Self::ReLU => x.map(|x| if x > &0.0 {1.0} else {0.0}),
             Self::LeakyReLU => x.map(|x| if x > &0.0 {1.0} else {0.01}),
@@ -59,33 +59,34 @@ pub enum Cost {
 }
 
 impl Cost {
-    pub fn apply(&self, p: &Array1<f64>, y: &Array1<f64>) -> Array1<f64> {
+    pub fn apply(&self, p: &Array1<f32>, y: &Array1<f32>) -> Array1<f32> {
         match self {
             Self::Mse => 0.5 * (p - y).map(|x| x.powi(2)),
             Self::CrossEntropy => -y * p.map(|x| x.log2()),
         }
     }
 
-    pub fn diff(&self, p: &Array1<f64>, y: &Array1<f64>) -> Array1<f64> {
+    pub fn diff(&self, p: &Array1<f32>, y: &Array1<f32>) -> Array1<f32> {
         match self {
             Self::Mse => p - y,
-            Self::CrossEntropy => (y * LN_HALF) / p,
+            Self::CrossEntropy => p - y,
+            // (y * LN_HALF) / p,
         }
     }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Layer {
-    weights: Array2<f64>,
-    biases: Array1<f64>,
+    weights: Array2<f32>,
+    biases: Array1<f32>,
     activation: Activation,
     child: Option<Box<RefCell<Layer>>>,
 }
 
 impl Layer {
     pub fn new(
-        weights: Array2<f64>,
-        biases: Array1<f64>,
+        weights: Array2<f32>,
+        biases: Array1<f32>,
         activation: Activation,
         child: Option<Box<RefCell<Layer>>>,
     ) -> Self {
@@ -94,8 +95,8 @@ impl Layer {
 
     pub fn random(inputs: usize, outputs: usize, activation: Activation) -> Self {
         Self {
-            weights: Array2::zeros((outputs, inputs)).map(|_: &f64| rand::random::<f64>() -0.5),
-            biases: Array1::zeros(outputs).map(|_: &f64| rand::random::<f64>() - 0.5),
+            weights: Array2::zeros((outputs, inputs)).map(|_: &f32| rand::random::<f32>() -0.5),
+            biases: Array1::zeros(outputs).map(|_: &f32| rand::random::<f32>() - 0.5),
             activation,
             child: None,
         }
@@ -117,12 +118,12 @@ impl Layer {
         }
     }
 
-    fn apply(&self, inputs: &Array1<f64>) -> Array1<f64> {
+    fn apply(&self, inputs: &Array1<f32>) -> Array1<f32> {
         let mx = self.weights.dot(inputs);
         self.activation.apply(&(mx + &self.biases))
     }
 
-    pub fn predict(&self, inputs: &Array1<f64>) -> Array1<f64> {
+    pub fn predict(&self, inputs: &Array1<f32>) -> Array1<f32> {
         let a = self.apply(inputs);
 
         match &self.child {
@@ -131,7 +132,7 @@ impl Layer {
         }
     }
 
-    pub fn train(&mut self, inputs: &Array1<f64>, outputs: &Array1<f64>, cost: &Cost, lr: f64) -> Array1<f64> {
+    pub fn train(&mut self, inputs: &Array1<f32>, outputs: &Array1<f32>, cost: &Cost, lr: f32) -> Array1<f32> {
         let da = match &self.child {
             Some(x) => {
                 let act = self.apply(inputs);
@@ -149,7 +150,7 @@ impl Layer {
         di
     }
 
-    pub fn differentiate(&mut self, inputs: &Array1<f64>, doutput: &Array1<f64>) -> (Array2<f64>, Array1<f64>, Array1<f64>) {
+    pub fn differentiate(&mut self, inputs: &Array1<f32>, doutput: &Array1<f32>) -> (Array2<f32>, Array1<f32>, Array1<f32>) {
         let z = &self.weights.dot(inputs) + &self.biases;
         let dz = self.activation.diff(&z);
         let rhs = &dz * doutput;
@@ -161,7 +162,7 @@ impl Layer {
         (dw, db, da)
     }
 
-    pub fn scale(&mut self, sf: f64) {
+    pub fn scale(&mut self, sf: f32) {
         self.weights *= sf;
         self.biases *= sf;
         if let Some(child) = &self.child {
